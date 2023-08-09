@@ -1,7 +1,8 @@
-﻿Clear-Host
+##Since PRTG Network Monitor only able to show ONE field from ONE line at the same time, 
+##and since it also doesn't have anything to automatically create WQL scripts, I present you with this rofloscript 
+Clear-Host
 $islocal = $true
-
-##No named parameters are available in 5.1 and I cba parsing them
+##No named parameters are available in 5.1 and I CBA parsing them
 if ($args.Length -eq 0)
 {
     $TGT_COMPUTERNAME = "localhost"
@@ -188,7 +189,7 @@ If(!(test-path -PathType container $dir))
 ###CPU
 if ($CPU.Length -gt 0)
 {
-    echo ("CPU Length: " + $CPU.Length);
+    echo ("CPUs: " + $CPU.Length);
     $CPUSens = GetSensorInfo $CPU;
     FileChecker "CPU" @("Value","Min","Max");
     WriterHW "CPU" $CPUSens @("Value","Min","Max");
@@ -198,7 +199,7 @@ if ($CPU.Length -gt 0)
 ###HDD
 if ($HDD.Length -gt 0)
 {
-    echo ("HDD Length: " + $HDD.Length)
+    echo ("HDDs: " + $HDD.Length)
     $HDDSens =  GetSensorInfo $HDD;
     FileChecker "HDD" @("Value","Min","Max");
     WriterHW "HDD" $HDDSens @("Value","Min","Max");
@@ -208,7 +209,7 @@ if ($HDD.Length -gt 0)
 ###RAM
 if ($RAM.Length -gt 0)
 {
-    echo ("RAM Length: " + $RAM.Length);
+    echo ("RAMs: " + $RAM.Length);
     $RAMSens =  GetSensorInfo $RAM;
     FileChecker "RAM" @("Value","Min","Max");
     WriterHW "RAM" $RAMSens @("Value","Min","Max");
@@ -218,7 +219,7 @@ if ($RAM.Length -gt 0)
 ###SuperIO
 if ($SIO.Length -gt 0)
 {
-    echo ("SIO Length: " + $SIO.Length);
+    echo ("SIOs: " + $SIO.Length);
     $SIOSens = GetSensorInfo $SIO;
     FileChecker "SuperIO" @("Value","Min","Max");
     WriterHW "SuperIO" $SIOSens @("Value","Min","Max");
