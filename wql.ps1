@@ -34,23 +34,23 @@ function FileChecker($HWTYPEFold, $Collumn)
         echo "Directory path is too long"
       } 
     }
-
+<#
     for ($i=0; $i -lt $Collumn.length; $i++)
     {
        $tmppath = $dir + "\" + $HWTYPEFold + "\" + $Collumn[$i];
        if(!(test-path -PathType container $tmppath))
        {
-             if ($tmppath.Length -lt 259)
-             {
-                  New-Item -ItemType Directory -Path $tmppath | Out-Null;
-             }
-             else 
-             {
-                  echo "Directory path is too long"
-             } 
+           if ($tmppath.Length -lt 259)
+           {
+              New-Item -ItemType Directory -Path $tmppath | Out-Null;
+           }
+           else 
+           {
+              echo "Directory path is too long"
+           } 
         }
     }
-
+#>
 }
 
 function SVAL ( $inp, $ident )
@@ -242,3 +242,5 @@ if ($SIO.Length -gt 0)
     FileChecker "SuperIO" @("Value","Min","Max");
     WriterHW "SuperIO" $SIOSens @("Value","Min","Max");
 }
+
+explorer $dir
