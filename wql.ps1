@@ -90,7 +90,7 @@ function FileWrite ($dirls, $type, $idls, $mode)
             try 
             {
                $FileStream.Dispose();
-               $FileStream  = New-Object System.IO.FileStream (([System.IO.Path]::Combine($path), [System.IO.FileMode]::Append, [System.IO.FileAccess]::Create, [IO.FileShare]::Read));
+               $FileStream  = New-Object System.IO.FileStream (([System.IO.Path]::Combine($path), [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [IO.FileShare]::Read));
             }
             catch 
             {
