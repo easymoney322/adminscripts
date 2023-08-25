@@ -141,6 +141,22 @@ function GetSensorInfo ($HWArray)
     return $retval;
 }
 
+function GetCredentialsMandatory ([ref]$_lsCREDS)
+{
+    try 
+    {
+       $_lsCREDS.Value = Get-Credential;
+    }
+    catch  
+    {
+        Write-Output "Ran into an issue inside of a function: $PSItem"
+        $_lsCREDS.Value = $null;
+        echo "Credentials are not full or missing!"
+     
+        Exit 401;
+    }
+}
+
 function WriterHW ($HWType, $HWSensorContainer, $Collumn) 
 {
     for ($i=0; $i -lt $HWSensorContainer.Length; $i++)
@@ -169,7 +185,8 @@ else
 {
     $islocal=$false;
     $Failed = $false;
-    $CREDS = Get-Credential;
+    [System.Management.Automation.PSCredential]$CREDS=$NULL;
+    GetCredentialsMandatory ([ref] $CREDS)
     do
     {
         $Failed = $false
@@ -181,9 +198,17 @@ else
         {
             echo "Access denied.";
             $Failed = $true;
-            $CREDS = Get-Credential;
+            GetCredentialsMandatory ([ref] $CREDS);
         }
-    } while ($Failed)
+    } while (($Failed) -and ($CREDS -ne $null))
+
+    if ($CREDS -eq $null)
+    {
+        Write-Output "Ran into an issue: $PSItem"
+        echo "Credentials are not full or missing!"
+        Exit 401;
+    }
+
     [System.Array]$MB  += Get-WmiObject -Namespace "root\OpenHardwareMonitor" -Class Hardware -ComputerName $TGT_COMPUTERNAME -Credential $CREDS | Where-Object -Property "HardwareType" -eq "Mainboard";
     [System.Array]$HDD += Get-WmiObject -Namespace "root\OpenHardwareMonitor" -Class Hardware -ComputerName $TGT_COMPUTERNAME -Credential $CREDS | Where-Object -Property "HardwareType" -eq "HDD";
     [System.Array]$RAM += Get-WmiObject -Namespace "root\OpenHardwareMonitor" -Class Hardware -ComputerName $TGT_COMPUTERNAME -Credential $CREDS | Where-Object -Property "HardwareType" -eq "RAM";
