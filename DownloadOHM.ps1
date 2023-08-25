@@ -1,8 +1,25 @@
-﻿$OutputEncoding = [console]::InputEncoding = [console]::OutputEncoding = [System.Text.Encoding]::GetEncoding("utf-8");
+$OutputEncoding = [console]::InputEncoding = [console]::OutputEncoding = [System.Text.Encoding]::GetEncoding("utf-8");
 $PSDefaultParameterValues['Out-File:Encoding'] = 'utf8';
 $DLDS = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path;
+
+$dlfold = Get-Item -Path $DLDS;
+$wasreadonly = $false;
+if ($dlfold.Attributes -imatch ".*ReadOnly.*" ) 
+{
+    $wasreadonly = $true;
+    $dlfold.Attributes = $dlfold.Attributes -band -bnot [System.IO.FileAttributes]::ReadOnly;
+    
+} 
+                               
+$DLDS += "/ohm.zip"
 Invoke-WebRequest -Uri 'https://openhardwaremonitor.org/files/openhardwaremonitor-v0.9.6.zip' -OutFile $DLDS;
-Expand-Archive ($DLDS+ "ohm.zip")  -DestinationPath 'C:\Program Files\'
+Expand-Archive ($DLDS)  -DestinationPath 'C:\Program Files\';
+
+if ($wasreadonly)
+{
+    $dlfold.Attributes = $dlfold.Attributes -bor[System.IO.FileAttributes]::ReadOnly;
+}
+
 $scheduleObject = New-Object -ComObject schedule.service;
 $scheduleObject.connect();
 $rootFolder = $scheduleObject.GetFolder("\");
