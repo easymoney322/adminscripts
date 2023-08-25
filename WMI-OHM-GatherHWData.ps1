@@ -1,9 +1,9 @@
-﻿Clear-Host
+Clear-Host
 $islocal = $true
 ##No named parameters are available in 5.1 and I CBA parsing them
 if ($args.Length -eq 0)
 {
-    $TGT_COMPUTERNAME = "localhost"
+    $TGT_COMPUTERNAME = "localhost";
 }
 else 
 {
@@ -14,21 +14,44 @@ else
 
 
 #CHANGEME
-$dir = "C:\Users\PC-ADM\Desktop\NewDocs\Hosts\" + $TGT_COMPUTERNAME; ##PRTG Doesn't search in subfolders for WQLs
+$dir1 = $env:USERPROFILE + "\Desktop\Hosts\";
+$dir2 = $dir1 + $TGT_COMPUTERNAME;
 #CHANGEME
 
-if(!(test-path -PathType container $dir))
+function CheckDir ($inputdir)
 {
-    if ($dir.Length -lt 259)
+    if(!(test-path -PathType container $inputdir))
     {
-      New-Item -ItemType Directory -Path $dir | Out-Null;
+        if ($inputdir.Length -lt 259)
+        {
+          New-Item -ItemType Directory -Path $inputdir | Out-Null;
+        }
+        else 
+        {
+            echo "Directory path " $inputdir " is too long"
+            exit 2147549493;
+        }
     }
-    else 
-      {
-        echo "Directory path is too long"
-      } 
 }
 
+function GetCredentialsMandatory ([ref]$_lsCREDS)
+{
+    try 
+    {
+       $_lsCREDS.Value = Get-Credential;
+    }
+    catch  
+    {
+        Write-Output "Ran into an issue inside of a function: $PSItem";
+        $_lsCREDS.Value = $null;
+        echo "Credentials are not full or missing!";
+     
+        Exit 401;
+    }
+}
+
+CheckDir $dir1 ;
+CheckDir $dir2 ;
 
 $List = @();
 $MB = @();
@@ -49,7 +72,8 @@ else
 {
     $islocal=$false;
     $Failed = $false;
-    $CREDS = Get-Credential;
+    [System.Management.Automation.PSCredential]$CREDS=$NULL;
+    GetCredentialsMandatory ([ref] $CREDS)
     do
     {
         $Failed = $false
@@ -61,20 +85,28 @@ else
         {
             echo "Access denied.";
             $Failed = $true;
-            $CREDS = Get-Credential;
+            GetCredentialsMandatory ([ref] $CREDS)
         }
-    } while ($Failed)
+    } while (($Failed) -and ($CREDS -ne $NULL))
+
+    if ($CREDS -eq $null)
+    {
+        Write-Output "Ran into an issue: $PSItem"
+        echo "Credentials are not full or missing!"
+        Exit 401;
+    }
 
     [System.Array]$MB  += Get-WmiObject -Namespace "root\OpenHardwareMonitor" -Class Hardware -ComputerName $TGT_COMPUTERNAME -Credential $CREDS | Where-Object -Property "HardwareType" -eq "Mainboard" | Select-Object -Property HardwareType,Name,Identifier;
     [System.Array]$HDD += Get-WmiObject -Namespace "root\OpenHardwareMonitor" -Class Hardware -ComputerName $TGT_COMPUTERNAME -Credential $CREDS | Where-Object -Property "HardwareType" -eq "HDD"       | Select-Object -Property HardwareType,Name,Identifier;
     [System.Array]$RAM += Get-WmiObject -Namespace "root\OpenHardwareMonitor" -Class Hardware -ComputerName $TGT_COMPUTERNAME -Credential $CREDS | Where-Object -Property "HardwareType" -eq "RAM"       | Select-Object -Property HardwareType,Name,Identifier;
     [System.Array]$SIO += Get-WmiObject -Namespace "root\OpenHardwareMonitor" -Class Hardware -ComputerName $TGT_COMPUTERNAME -Credential $CREDS | Where-Object -Property "HardwareType" -eq "SuperIO"   | Select-Object -Property HardwareType,Name,Identifier;
 }
+
 $List = $CPU + $MB + $SIO + $HDD + $RAM;
-$path = ($dir + "\OHM-HWInfo.txt");
+$path = ($dir2 + "\OHM-HWInfo.txt");
 try
 {
-    [System.IO.Stream]$FileStream  = New-Object System.IO.FileStream (([System.IO.Path]::Combine($path), [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [IO.FileShare]::Read))
+    [System.IO.Stream]$FileStream  = New-Object System.IO.FileStream (([System.IO.Path]::Combine($path), [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [IO.FileShare]::Read));
 }
 catch 
 {
@@ -96,8 +128,10 @@ while ($FileStream.CanWrite -eq $false)
 }
 $sw = New-Object System.IO.StreamWriter([System.IO.Stream]$FileStream, [Text.Encoding]::UTF8);
 $sw.AutoFlush = $true;
+
 $sw.WriteLine((Out-String -InputObject $List));
 $sw.Flush();
+echo "File '$path' written!";
 try
 {
     $sw.Dispose();
@@ -108,9 +142,11 @@ catch
 }
 try 
 {
-$FileStream.Dispose();
+    $FileStream.Dispose();
 }
 catch 
 {
-echo "Unable to dispose filestream object";
+    echo "Unable to dispose filestream object";
 }
+
+explorer $dir1;
