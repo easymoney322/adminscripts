@@ -1,6 +1,4 @@
 $OutputEncoding = [console]::InputEncoding = [console]::OutputEncoding = [System.Text.Encoding]::GetEncoding("utf-8");
-Clear-Host;
-
 try 
 {
     Set-ExecutionPolicy -ExecutionPolicy Bypass -Force -Scope Process;
@@ -8,9 +6,9 @@ try
     Set-ExecutionPolicy -ExecutionPolicy Bypass -Force -Scope CurrentUser;
 }catch
 {
-    echo "Error occured during the change of execution policy";
+    Write-Host ("Error occured during the change of execution policy");
 }
-
+Clear-Host;
 
 $whitelist = @("192.168.100.73", "192.168.100.24", "192.168.100.1", "192.168.0.24", "192.168.100.43");
 $firewallRules = @();
@@ -22,12 +20,15 @@ $ruleOutboundExists = $true;
 
 try
 {
-    $firewallRules = Get-NetFirewallrule -DisplayName 'NewFromADM' -ErrorAction Stop;
+$firewallRules = Get-NetFirewallrule -DisplayName 'NewFromADM' -ErrorAction Stop;
 }catch  [Microsoft.PowerShell.Cmdletization.Cim.CimJobException] 
 {
     if ($_.Exception.Message -imatch ".*DisplayName.*")
     {
         $rulesExist = $false;
+    }else
+    {
+        Write-Error ($_.Exception.Message);
     }
 }
 
@@ -50,6 +51,7 @@ if ($rulesExist -eq $true)
 {
     New-NetFirewallRule -DisplayName NewFromADM -Action Allow -RemoteAddress $whitelist -Direction Inbound -Enabled "True";  
     New-NetFirewallRule -DisplayName NewFromADM -Action Allow -RemoteAddress $whitelist -Direction Outbound -Enabled "True";
+    [System.Threading.Thread]::Sleep(5000);
     Exit;
 }
 
@@ -70,7 +72,6 @@ if ($ruleOutboundExists -eq $false)
 }
 
 
-
 winrm quickconfig -quiet;
 [System.Threading.Thread]::Sleep(2300);
 Enable-PSRemoting –Force;
@@ -82,6 +83,6 @@ if (!("Automatic".Equals($ST)))
     Set-Service -Name WinRM -StartupType Automatic;
 }else
 {
-    echo "WinRM is already set to Automatic";
+    Write-Debug ("WinRM is already set to Automatic");
 }
 Set-PSSessionConfiguration -ShowSecurityDescriptorUI -Name Microsoft.PowerShell;
