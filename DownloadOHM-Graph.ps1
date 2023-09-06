@@ -160,11 +160,11 @@ if ($(ServiceCheck "OhmGraphite") -eq $false)
                     $WebClient.DownloadFile($dlUrl, $fileGraphite);
                 }catch 
                 {
-                    Write-Error ($_.Exception.Message);
                     if ($wasreadonly)
                     {
                         $dlfold.Attributes = $dlfold.Attributes -bor[System.IO.FileAttributes]::ReadOnly;
                     }
+                    Write-Error ($_.Exception.Message);
                     [System.Threading.Thread]::Sleep(5000);
                     Exit; 
                 }
@@ -216,8 +216,7 @@ if ($(ServiceCheck "OhmGraphite") -eq $false)
             $sw.Dispose();
         }catch 
         {
-            Write-Error "Unable to dispose StreamWriter object";
-            Write-Error ($_.Exception.Message);
+            Write-Error ("Unable to dispose StreamWriter object" + ($_.Exception.Message));
         }
 
         try 
@@ -225,8 +224,7 @@ if ($(ServiceCheck "OhmGraphite") -eq $false)
             $FileStreamPCinfo.Dispose();
         }catch 
         {
-            Write-Error "Unable to dispose filestream object:";
-            Write-Error ($_.Exception.Message);
+            Write-Error ("Unable to dispose filestream object:" + ($_.Exception.Message));
         }
 
         Start-Process -FilePath $($INSTPATH+'OHMGraphite\OhmGraphite.exe') -ArgumentList "install" -WorkingDirectory $($INSTPATH+'OHMGraphite\');
@@ -236,8 +234,7 @@ if ($(ServiceCheck "OhmGraphite") -eq $false)
             Start-Service OhmGraphite;
         }catch
         {
-            Write-Error "Unable to start Graphite service:";
-            Write-Error ($_.Exception.Message);
+            Write-Error ("Unable to start Graphite service:" + ($_.Exception.Message));
         }
 
     }else
@@ -277,11 +274,11 @@ if ($(ServiceCheck "windows_exporter") -eq $false)
                     $WebClient.DownloadFile($ExporterPrefixLink, $filePrometheusExporterInstaller);
                 }catch 
                 {
-                    Write-Error ($_.Exception.Message);
                     if ($wasreadonly)
                     {
                         $dlfold.Attributes = $dlfold.Attributes -bor[System.IO.FileAttributes]::ReadOnly;
                     }
+                    Write-Error ($_.Exception.Message);
                     [System.Threading.Thread]::Sleep(5000);
                 }   Exit; 
             }
@@ -294,8 +291,7 @@ if ($(ServiceCheck "windows_exporter") -eq $false)
             Start-Service "windows_exporter"
         }catch
         {
-            Write-Error ("Unable to start windows_exporter service:");
-            Write-Error ($_.Exception.Message);
+            Write-Error ("Unable to start windows_exporter service:" + ($_.Exception.Message));
         }
     }
 }
@@ -318,11 +314,11 @@ if ($false -eq (Test-Path -Path $($INSTPATH+"SmartMonTools/bin/smartctl.exe") -P
                     $WebClient.DownloadFile($smartMonPrefixLink, $fileSmartMonInstaller);
                 }catch 
                 {
-                    Write-Error ($_.Exception.Message);
                     if ($wasreadonly)
                     {
                         $dlfold.Attributes = $dlfold.Attributes -bor[System.IO.FileAttributes]::ReadOnly;
                     }
+                    Write-Error ($_.Exception.Message);
                     [System.Threading.Thread]::Sleep(5000);
                     Exit;
                 }
@@ -336,11 +332,11 @@ if ($false -eq (Test-Path -Path $($INSTPATH+"SmartMonTools/bin/smartctl.exe") -P
             Start-Process  -NoNewWindow -FilePath $fileSmartMonInstaller -ArgumentList "/S /D=`"$smartMonDir`" ";
     }catch
     {
-        Write-Error ($_.Exception.Message);
         if ($wasreadonly)
         {
             $dlfold.Attributes = $dlfold.Attributes -bor[System.IO.FileAttributes]::ReadOnly;
         }
+        Write-Error ($_.Exception.Message);
         [System.Threading.Thread]::Sleep(5000);
         Exit;
     }
@@ -379,11 +375,11 @@ if ($(ServiceCheck "SmartCtlExporter") -eq $false)
                     $WebClient.DownloadFile($SmartCTLExporterURL, $SmartCTLExporterFile);
                 }catch 
                 {
-                    Write-Error ($_.Exception.Message);
                     if ($wasreadonly)
                     {
                         $dlfold.Attributes = $dlfold.Attributes -bor[System.IO.FileAttributes]::ReadOnly;
                     }
+                    Write-Error ($_.Exception.Message);
                     [System.Threading.Thread]::Sleep(5000);
                     Exit;
                 }
@@ -399,7 +395,7 @@ if ($(ServiceCheck "SmartCtlExporter") -eq $false)
         $rootFolder.CreateFolder("Prometheus");
     }catch
     {
-        write-host ($_.Exception.Message);
+        write-host ($_.Exception.Message); ##Do nothing and assume that folder already exists
     }
     $action = New-ScheduledTaskAction -Execute $('"' + $SmartCTLExporterExec + '"') -Argument $("--smartctl.path='C:\Program Files\smartmontools\bin\smartctl.exe'");
     $trigger = New-ScheduledTaskTrigger -AtStartup -RandomDelay (New-TimeSpan -minutes 3);
@@ -410,7 +406,7 @@ if ($(ServiceCheck "SmartCtlExporter") -eq $false)
         Register-ScheduledTask -TaskName "SmartCtlExporter" -TaskPath '\Prometheus\' -RunLevel Highest -User "System" -Action $action -Settings $settings -Trigger $trigger;
     }catch
     {
-        Set-ScheduledTask -TaskPath '\Prometheus' -TaskName "SmartCtlExporter" -Settings $settings -Trigger $trigger -Action $action;
+        Set-ScheduledTask -TaskPath '\Prometheus' -TaskName "SmartCtlExporter" -Settings $settings -Trigger $trigger -Action $action; ##Assume task is already registered
     }
     try
     {
