@@ -157,7 +157,7 @@ if ($(ServiceCheck "OhmGraphite") -eq $false)
                 {
                     Write-Host ($_.Exception.Message);
                     $WebClient = New-Object System.Net.WebClient; ##Assume that Invoke-WebRequest is not supported 
-                    WebClient.DownloadFile($dlUrl, $fileGraphite);
+                    $WebClient.DownloadFile($dlUrl, $fileGraphite);
                 }catch 
                 {
                     Write-Error ($_.Exception.Message);
@@ -274,7 +274,7 @@ if ($(ServiceCheck "windows_exporter") -eq $false)
                 {
                     Write-Host ($_.Exception.Message);
                     $WebClient = New-Object System.Net.WebClient; ##Assume that Invoke-WebRequest is not supported 
-                    WebClient.DownloadFile($ExporterPrefixLink, $filePrometheusExporterInstaller);
+                    $WebClient.DownloadFile($ExporterPrefixLink, $filePrometheusExporterInstaller);
                 }catch 
                 {
                     Write-Error ($_.Exception.Message);
@@ -315,7 +315,7 @@ if ($false -eq (Test-Path -Path $($INSTPATH+"SmartMonTools/bin/smartctl.exe") -P
                 {
                     Write-Host ($_.Exception.Message);
                     $WebClient = New-Object System.Net.WebClient; ##Assume that Invoke-WebRequest is not supported 
-                    WebClient.DownloadFile($smartMonPrefixLink, $fileSmartMonInstaller);
+                    $WebClient.DownloadFile($smartMonPrefixLink, $fileSmartMonInstaller);
                 }catch 
                 {
                     Write-Error ($_.Exception.Message);
@@ -376,7 +376,7 @@ if ($(ServiceCheck "SmartCtlExporter") -eq $false)
                 {
                     Write-Host ($_.Exception.Message);
                     $WebClient = New-Object System.Net.WebClient; ##Assume that Invoke-WebRequest is not supported 
-                    WebClient.DownloadFile($SmartCTLExporterURL, $SmartCTLExporterFile);
+                    $WebClient.DownloadFile($SmartCTLExporterURL, $SmartCTLExporterFile);
                 }catch 
                 {
                     Write-Error ($_.Exception.Message);
