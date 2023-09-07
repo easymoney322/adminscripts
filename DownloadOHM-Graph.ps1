@@ -5,7 +5,6 @@ try {
 }
 $PSDefaultParameterValues['Out-File:Encoding'] = 'utf8';
 $PSDefaultParameterValues['Invoke-WebRequest:MaximumRetryCount'] = 5;
-Clear-Host;
 $INSTPATH = 'C:\Program Files\';
 $graphiteVersion = '0.30.0';
 $ExporterVersion = "0.23.1";
@@ -14,11 +13,12 @@ $SmartMonReleaseDir = "7_4";
 $SmartCTLExporterVersion = "0.11.0";
 $downloadDir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path;
 $dlfold = Get-Item -Path $downloadDir;
+$schedulerFolderExists=$false;
 function ServiceCheck([string] $ServiceName){
     $serviceQuery = "Select * from Win32_Service WHERE name like  '%" + $ServiceName + "%'";
     $SrvcList = (Get-CimInstance -Query $serviceQuery);
     if ($SrvcList -ne $null){
-        Write-Host "Found service " + $ServiceName;
+        Write-Host ("Found service " + $ServiceName);
         [System.Array]$ServicePath = @();
         $ServicePathString= $SrvcList.PathName -split " --";
         if ($ServicePathString -ne $null){
@@ -31,7 +31,7 @@ function ServiceCheck([string] $ServiceName){
                         }
                     }
                     if ($indxList.Length -gt 1){
-                        write-host "LVAL=" $lval;
+                        Write-Debug ("LVAL=" + $lval);
                         [int]$lval = $indxList[0];
                         [int]$rval = $indxList[1];
                         $bubble = [string]($ServicePathString[$i]).Substring($lval+1, $rval-$lval-1);
@@ -41,12 +41,14 @@ function ServiceCheck([string] $ServiceName){
                 }
             }
             if ($ServicePath -ne $null) {
-                Write-Host "Succesfully extracted executable path from " + $ServiceName + " service";
+                Write-Host ("Succesfully extracted executable path from " + $ServiceName + " service");
                 for ($k=0; $k -lt $ServicePath.Length; $k++){
-                    write-host $ServicePath[$k]
-                    if (Test-Path -Path $($ServicePath[$k]) -PathType Leaf){
-                        Write-Host ("Found " + $ServiceName + " executable at " + $ServicePath[$k]);
-                        return $true;
+                    if ($null -ne $ServicePath[$k]){
+                        Write-Host ($ServicePath[$k]);
+                        if (Test-Path -Path $($ServicePath[$k]) -PathType Leaf){
+                            Write-Host ("Found " + $ServiceName + " executable at " + $ServicePath[$k]);
+                            return $true;
+                        }
                     }
                 }
                 Write-Host ("Exporter executables were not found"); 
@@ -117,7 +119,7 @@ function UnquoteAString([string] $inputString){
           for ([int]$i=1; $i -lt $indxList.Length; $i++){
               if ($qtsmbl -eq $indxList[$i].Character){
                   $rpos = $indxList[$i].Position;
-                  Write-Host ($rpos);
+                  Write-Debug ("String is being terminated at index " +$rpos);
                   break;
               }
           }
@@ -139,13 +141,14 @@ function SchedulerCheck([string] $TaskDir, $TaskName ){
     $schedulerInterface.connect();
     try{
         $schedulerRoot = $schedulerInterface.GetFolder('\');
-    }catch{
+    } catch{
         Write-Warning ("Scheduler interface isn't working:" +  ($_.Exception.Message));
         Exit;
     }
     try{
     $schedulerRoot = $schedulerInterface.GetFolder($searchFolder);
-    }catch{
+    $schedulerFolderExists=$true;
+    } catch{
         Write-Host ('Scheduler folder wasnt found:' + ($_.Exception.Message) );
         try {
             [System.Runtime.Interopservices.Marshal]::ReleaseComObject($schedulerInterface) | Out-Null;
@@ -156,8 +159,8 @@ function SchedulerCheck([string] $TaskDir, $TaskName ){
         }
     Write-Debug ("Found the folder");
     try {
-        $result = Get-ScheduledTask -TaskPath ('\' + $TaskDir +'\') -TaskName $TaskName;   
-    }catch{
+        $result = Get-ScheduledTask -TaskPath ('\' + $TaskDir +'\') -TaskName $TaskName -ErrorAction "Stop";   
+    } catch{
         Write-Host ('Unable to find schedulers task: ' +  ($_.Exception.Message));
         try {
             [System.Runtime.Interopservices.Marshal]::ReleaseComObject($schedulerInterface) | Out-Null;
@@ -169,13 +172,15 @@ function SchedulerCheck([string] $TaskDir, $TaskName ){
     Write-Debug ('Found scheduler job ' + '\' + $TaskDir + '\' + $TaskName);
     try {
         [System.Runtime.Interopservices.Marshal]::ReleaseComObject($schedulerInterface) | Out-Null;
-    }catch{
+    } catch{
         Write-Warning ("Unable to release Scheduler COM object:" + ($_.Exception.Message));
         }
         $execPath = $result.Actions.Execute;
+        if ($null -ne $execPath) {
         $execPathTrimmed = (UnquoteAString $execPath);
         if (Test-Path -Path $execPathTrimmed -PathType Leaf){
             return $true;
+            }
         }else{
             Write-Host ('Scheduler task was found, but an executable - wasnt');
         }
@@ -377,12 +382,14 @@ if ($false -eq (SchedulerCheck "Prometheus" "SmartCtlExporter" )){
     $scheduleObject = New-Object -ComObject schedule.service; #Add service
     $scheduleObject.connect();
     $rootFolder = $scheduleObject.GetFolder('\');
+    if ($false -eq $schedulerFolderExists){ 
     try {
         $rootFolder.CreateFolder("Prometheus");
     }catch{
-        write-host ($_.Exception.Message); ##Do nothing and assume that folder already exists
+        Write-Warning ("An error occured when tried to create task scheduler folder: " + $_.Exception.Message); 
     }
-    $action = New-ScheduledTaskAction -Execute $('"' + $SmartCTLExporterExec + '"') -Argument $("--smartctl.path='C:\Program Files\smartmontools\bin\smartctl.exe'");
+    }
+    $action = New-ScheduledTaskAction -Execute $('"' + $SmartCTLExporterExec + '"') -Argument $('--smartctl.path="C:\Program Files\smartmontools\bin\smartctl.exe"');
     $trigger = New-ScheduledTaskTrigger -AtStartup -RandomDelay (New-TimeSpan -minutes 3);
     $settings = $(New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0);
     try{
