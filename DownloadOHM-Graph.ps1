@@ -11,9 +11,20 @@ $ExporterVersion = "0.23.1";
 $SmartMonVersion = "7.4-1";
 $SmartMonReleaseDir = "7_4";
 $SmartCTLExporterVersion = "0.11.0";
+$PromtailVersion = "2.9.0";
+$PromtailListenPort = "9080";
+$loki = "http://192.168.100.1:3100";
+$lokiapi = $loki + '/loki/api/v1/push';
+$IANATimezoneDatabasestring = 'Asia/Yekaterinburg';
 $downloadDir = (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path;
 $dlfold = Get-Item -Path $downloadDir;
-$schedulerFolderExists=$false;
+$schedulerFolderExists = $false;
+$arch=$null;
+    if ([Environment]::Is64BitProcess -eq [Environment]::Is64BitOperatingSystem){
+        $arch="amd64";
+    }else {
+        $arch="386";
+    }
 function ServiceCheck([string] $ServiceName){
     $serviceQuery = "Select * from Win32_Service WHERE name like  '%" + $ServiceName + "%'";
     $SrvcList = (Get-CimInstance -Query $serviceQuery);
@@ -220,7 +231,11 @@ if ($(ServiceCheck "OhmGraphite") -eq $false) {
         if($false -eq (Test-Path ($INSTPATH+'OHMGraphite\'))) {
             New-Item -Path ($INSTPATH+'OHMGraphite\') -ItemType Directory;
         }
-        Expand-Archive ($fileGraphite)  -DestinationPath ($INSTPATH+'OHMGraphite\') -Force;
+        try{
+        Expand-Archive ($fileGraphite)  -DestinationPath ($INSTPATH+'OHMGraphite\')  -Force -ErrorAction Stop;
+        }catch{
+        Write-Error ("Unable to unzip " +$fileGraphite + ": " +$_.Exception.Message);
+        }
         $configFilePath = $INSTPATH+'OHMGraphite\OhmGraphite.exe.config';
         [System.IO.Stream]$FileStreamPCinfo  = New-Object System.IO.FileStream (([System.IO.Path]::Combine($configFilePath ), [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [IO.FileShare]::Read));
         while ($FileStreamPCinfo.CanWrite -eq $false){
@@ -275,12 +290,7 @@ if ($(ServiceCheck "OhmGraphite") -eq $false) {
 if ($(ServiceCheck "windows_exporter") -eq $false) {
     if ($false -eq (Test-Path -Path $($INSTPATH+'windows_exporter\windows_exporter.exe') -PathType Leaf)){
         Write-Host "Wasn't able to find Windows Exporter installation path. Starting the installation";
-        $exporterPrefixLink = "https://github.com/prometheus-community/windows_exporter/releases/download/v" + $ExporterVersion+"/windows_exporter-"+$ExporterVersion;
-        if ([Environment]::Is64BitProcess -eq [Environment]::Is64BitOperatingSystem){
-            $exporterPrefixLink+="-amd64.msi";
-        }else{
-            $exporterPrefixLink+="-386.msi";
-        }
+        $exporterPrefixLink = "https://github.com/prometheus-community/windows_exporter/releases/download/v" + $ExporterVersion+"/windows_exporter-"+$ExporterVersion + "-" +$arch;
         $filePrometheusExporterInstaller = $downloadDir+'\ExporterInstaller.msi';
         if ($false -eq (Test-Path -Path $filePrometheusExporterInstaller -PathType Leaf)){
             try{
@@ -346,11 +356,7 @@ if ($false -eq (Test-Path -Path $($INSTPATH+"SmartMonTools/bin/smartctl.exe") -P
     }
 }
 if ($false -eq (SchedulerCheck "Prometheus" "SmartCtlExporter" )){
-    if ([Environment]::Is64BitProcess -eq [Environment]::Is64BitOperatingSystem){
-        $SmartCTLexporterSufffixLink=".windows-amd64";
-    }else {
-        $SmartCTLexporterSufffixLink=".windows-386";
-    }
+    $SmartCTLexporterSufffixLink=(".windows-" + $arch);
     $SmartCTLExporterExec = $INSTPATH +"smartctl_exporter-"+$SmartCTLExporterVersion + $SmartCTLexporterSufffixLink + "/smartctl_exporter.exe";
     if ($false -eq (Test-Path -Path $SmartCTLExporterExec -PathType Leaf)){
         Write-Host ("SmartCTLExporter not found"); ##Installation not found
@@ -377,7 +383,11 @@ if ($false -eq (SchedulerCheck "Prometheus" "SmartCtlExporter" )){
                 }
             }
         }
-        Expand-Archive ($SmartCTLExporterFile) -DestinationPath ($INSTPATH); ##Install (or rather unzip)
+        try{
+        Expand-Archive ($SmartCTLExporterFile) -DestinationPath ($INSTPATH)  -Force -ErrorAction Stop; ##Install (or rather unzip)
+                }catch{
+        Write-Error ("Unable to unzip " + $SmartCTLExporterFile + ": " +$_.Exception.Message);
+        }
     }
     $scheduleObject = New-Object -ComObject schedule.service; #Add service
     $scheduleObject.connect();
@@ -386,14 +396,13 @@ if ($false -eq (SchedulerCheck "Prometheus" "SmartCtlExporter" )){
     try {
         $rootFolder.CreateFolder("Prometheus");
     }catch{
-        Write-Warning ("An error occured when tried to create task scheduler folder: " + $_.Exception.Message); 
-    }
+        Write-Warning ("An error occured when tried to create task scheduler folder: " + $_.Exception.Message);}
     }
     $action = New-ScheduledTaskAction -Execute $('"' + $SmartCTLExporterExec + '"') -Argument $('--smartctl.path="C:\Program Files\smartmontools\bin\smartctl.exe"');
     $trigger = New-ScheduledTaskTrigger -AtStartup -RandomDelay (New-TimeSpan -minutes 3);
     $settings = $(New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0);
     try{
-        Register-ScheduledTask -TaskName "SmartCtlExporter" -TaskPath '\Prometheus\' -RunLevel Highest -User "System" -Action $action -Settings $settings -Trigger $trigger;
+        Register-ScheduledTask -TaskName "SmartCtlExporter" -TaskPath '\Prometheus\' -RunLevel Highest -User "System" -Action $action -Settings $settings -Trigger $trigger  -ErrorAction Stop;
     }catch{
         Set-ScheduledTask -TaskPath '\Prometheus\' -TaskName "SmartCtlExporter" -Settings $settings -Trigger $trigger -Action $action; ##Assume task is already registered
     }
@@ -402,12 +411,173 @@ if ($false -eq (SchedulerCheck "Prometheus" "SmartCtlExporter" )){
     }catch
     {
         Write-Error ($_.Exception.Message);
-    }
+    }finally{
     [System.Runtime.Interopservices.Marshal]::ReleaseComObject($scheduleObject) | Out-Null;
+    }
 }else{
     Write-Host ("Found SmartCtlExporter scheduler task");
+}
+if ($false -eq (SchedulerCheck "Prometheus" "Promtail" )){
+            $PromtailDir = $INSTPATH + "Promtail";
+            $PromtailExecPath = $PromtailDir + '/promtail-windows-amd64.exe';
+            if ($true -eq (Test-Path -Path $($INSTPATH + "Promtail") -PathType Container)) {
+                Write-Debug ("Promtail directory exists");
+            }else {
+                New-Item -Path $INSTPATH -Name "Promtail" -ItemType "directory";
+                  }
+            if ($true -eq (Test-Path -Path $($PromtailDir + '\var') -PathType Container)) {
+                Write-Debug ("Promtail var directory already exists");
+            }else {
+                New-Item -Path $PromtailDir -Name "var" -ItemType "directory";
+                  }
+            if ($true -eq (Test-Path -Path $($PromtailDir + '\log') -PathType Container)) {
+                Write-Debug ("Promtail log directory already exists");
+            }else {
+                New-Item -Path $PromtailDir -Name "log" -ItemType "directory";
+                  }
+            if ($false -eq (Test-Path -Path $PromtailExecPath -PathType Leaf)){
+                    $PromtailArchivePath = $downloadDir + '/promtail-v' + $PromtailVersion + ".zip";
+                    if ($true -eq (Test-Path -Path $PromtailExecPath -PathType Leaf)){
+                        Write-Debug ("Found promtail archive");
+                    }else{
+                        try{
+                              $PromtailURL = "https://github.com/grafana/loki/releases/download/v" + $PromtailVersion + "/promtail-windows-" + $arch +".exe.zip";
+                              Write-Debug ($PromtailURL);
+                              Invoke-WebRequest -Uri $PromtailURL -OutFile $PromtailArchivePath -UseBasicParsing; 
+                            }catch{
+                                try {
+                                        Write-Host ($_.Exception.Message);
+                                        $WebClient = New-Object System.Net.WebClient; ##Assume that Invoke-WebRequest is not supported 
+                                        $WebClient.DownloadFile($PromtailURL, $PromtailArchivePath);
+                                    }catch {
+                                        if ($wasreadonly){
+                                                             $dlfold.Attributes = $dlfold.Attributes -bor[System.IO.FileAttributes]::ReadOnly;
+                                                         }
+                                        Write-Error ($_.Exception.Message);
+                                        [System.Threading.Thread]::Sleep(5000);
+                                        Exit;
+                                           }
+                                  }
+                         }
+                   Write-Host ("Started promtail installation");
+                   try{
+                   Expand-Archive ($PromtailArchivePath) -DestinationPath ($PromtailDir) -Force -ErrorAction Stop; ##Install (or rather unzip)
+                   }catch {
+                      Write-Error ("Unable to expand promtail archive to the " + $PromtailDir + " directory:" + $_.Exception.Message);
+                   }
+                    $PromtailConfigPath=$PromtailDir+'\promtail-local-config.yaml';
+                    [System.IO.Stream]$PromtailFS  = New-Object System.IO.FileStream (([System.IO.Path]::Combine( $PromtailConfigPath ), [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [IO.FileShare]::Read));
+                    while ($PromtailFS.CanWrite -eq $false){
+                        try{
+                           $PromtailFS.Dispose();
+                           $PromtailFS  = New-Object System.IO.FileStream (([System.IO.Path]::Combine( $PromtailConfigPath ), [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [IO.FileShare]::Read));
+                        }catch {
+                            Write-Debug ("File is busy");
+                            [System.Threading.Thread]::Sleep(5000);
+                            $PromtailFS.Dispose();
+                        }
+                    }
+                    [string]$PromtailLogs = ($PromtailDir+'\log\*');
+                    $PromtailBookmarkApplication = $PromtailDir +'\var\bookmark-application.xml'
+                    $PromtailBookmarkSystem= $PromtailDir +'\var\bookmark-system.xml'
+                    $Promtailsw = New-Object System.IO.StreamWriter([System.IO.Stream]$PromtailFS, [Text.Encoding]::UTF8);
+                    $Promtailsw.AutoFlush = $true;
+                    $Promtailsw.WriteLine('server:');
+                    $Promtailsw.WriteLine('  http_listen_port: '+ $PromtailListenPort);
+                    $Promtailsw.WriteLine('  grpc_listen_port: 0');
+                    $Promtailsw.WriteLine('positions:');
+                    $PromtailPositionsFile=$PromtailDir+'\var\positions.yaml';
+                    $Promtailsw.WriteLine('  filename: ' + "'" + $PromtailPositionsFile + "'");
+                    $Promtailsw.WriteLine('clients:');
+                    $Promtailsw.WriteLine('  - url: ' + $lokiapi);
+                    $Promtailsw.WriteLine('scrape_configs:');
+                    $Promtailsw.WriteLine('- job_name: scrape');
+                    $Promtailsw.WriteLine('  pipeline_stages:');
+                    $Promtailsw.WriteLine('  - output:');
+                    $Promtailsw.WriteLine('      source: message');
+                    $Promtailsw.WriteLine('      action_on_failure: skip');
+                    $Promtailsw.WriteLine('  static_configs:');
+                    $Promtailsw.WriteLine('  - targets:');
+                    $Promtailsw.WriteLine('      - localhost');
+                    $Promtailsw.WriteLine('    labels:');
+                    $Promtailsw.WriteLine('      job: filelogs');
+                    $Promtailsw.WriteLine('      agent: promtail');
+                    $Promtailsw.WriteLine('      __path__: ' + "'" + $PromtailLogs +"'");
+                    $Promtailsw.WriteLine('- job_name: windows-application');
+                    $Promtailsw.WriteLine('  pipeline_stages:');
+                    $Promtailsw.WriteLine('  - timestamp:');
+                    $Promtailsw.WriteLine('      location: ' + $IANATimezoneDatabasestring);
+                    $Promtailsw.WriteLine('      source: timestamp');
+                    $Promtailsw.WriteLine('      format: RFC1123');
+                    $Promtailsw.WriteLine('      fallback_formats: [RFC3339Nano]');
+                    $Promtailsw.WriteLine('  windows_events:');
+                    $Promtailsw.WriteLine('    use_incoming_timestamp: true');
+                    $Promtailsw.WriteLine('    exclude_event_data: true');
+                    $Promtailsw.WriteLine('    exclude_user_data: true');
+                    $Promtailsw.WriteLine('    bookmark_path: ''' + $PromtailBookmarkApplication + "'");
+                    $Promtailsw.WriteLine('    eventlog_name: "Application"');
+                    $Promtailsw.WriteLine('    xpath_query: ''*''');
+                    $Promtailsw.WriteLine('    poll_interval: 1m');
+                    $Promtailsw.WriteLine('    locale: 1033');
+                    $Promtailsw.WriteLine('    labels:');
+                    $Promtailsw.WriteLine('      job: windows');
+                    $Promtailsw.WriteLine('      logsource: windows-eventlog');
+                    $Promtailsw.WriteLine('- job_name: windows-system');
+                    $Promtailsw.WriteLine('  pipeline_stages:');
+                    $Promtailsw.WriteLine('  - timestamp:');
+                    $Promtailsw.WriteLine('      location: ' + $IANATimezoneDatabasestring);
+                    $Promtailsw.WriteLine('      source: timestamp');
+                    $Promtailsw.WriteLine('      format: RFC1123');
+                    $Promtailsw.WriteLine('      fallback_formats: [RFC3339Nano]');
+                    $Promtailsw.WriteLine('  windows_events:');
+                    $Promtailsw.WriteLine('    use_incoming_timestamp: true');
+                    $Promtailsw.WriteLine('    exclude_event_data: true');
+                    $Promtailsw.WriteLine('    exclude_user_data: true');
+                    $Promtailsw.WriteLine('    bookmark_path: ' + "'" + $PromtailBookmarkSystem + "'");
+                    $Promtailsw.WriteLine('    eventlog_name: "System"');
+                    $Promtailsw.WriteLine('    xpath_query: ''*''');
+                    $Promtailsw.WriteLine('    poll_interval: 1m');
+                    $Promtailsw.WriteLine('    locale: 1033');
+                    $Promtailsw.WriteLine('    labels:');
+                    $Promtailsw.WriteLine('      job: windows');
+                    $Promtailsw.WriteLine('      logsource: windows-eventlog');
+                    try{
+                        $Promtailsw.Dispose();
+                    }catch {
+                        Write-Error ("Unable to dispose StreamWriter object" + ($_.Exception.Message));
+                    }
+                    try {
+                        $PromtailFS.Dispose();
+                    }catch {
+                        Write-Error ("Unable to dispose filestream object:" + ($_.Exception.Message));
+                    }
+                    $scheduleObject = New-Object -ComObject schedule.service; #Add service
+                    $scheduleObject.connect();
+                    $rootFolder = $scheduleObject.GetFolder('\');
+                    if ($false -eq $schedulerFolderExists){ 
+                       try {
+                           $rootFolder.CreateFolder("Prometheus");
+                       }catch{
+                           Write-Warning ("An error occured when tried to create task scheduler folder: " + $_.Exception.Message); 
+                        }
+                            $action = New-ScheduledTaskAction -Execute $('"' + $PromtailExecPath + '"') -Argument $('--config.file="'+ $PromtailDir +'\promtail-local-config.yaml" --config.expand-env=true');
+                            $trigger = New-ScheduledTaskTrigger -AtStartup -RandomDelay (New-TimeSpan -minutes 3);
+                            $settings = $(New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0);
+                            try{
+                                Register-ScheduledTask -TaskName "Promtail" -TaskPath '\Prometheus\' -RunLevel Highest -User "System" -Action $action -Settings $settings -Trigger $trigger -ErrorAction Stop;
+                            }catch{
+                                Set-ScheduledTask -TaskPath '\Prometheus\' -TaskName "Promtail" -Settings $settings -Trigger $trigger -Action $action; ##Assume task is already registered
+                             }
+                            try{
+                                Start-ScheduledTask -TaskPath '\Prometheus\' -TaskName "Promtail";
+                            }catch{
+                                Write-Error ($_.Exception.Message);
+                             }finally{
+                                        [System.Runtime.Interopservices.Marshal]::ReleaseComObject($scheduleObject) | Out-Null;
+                                     }
+                                                        }
+                                                                             }
 }
 if ($wasreadonly){
     $dlfold.Attributes = $dlfold.Attributes -bor[System.IO.FileAttributes]::ReadOnly;
 }
-  
