@@ -7,7 +7,7 @@ $PSDefaultParameterValues['Out-File:Encoding'] = 'utf8';
 $PSDefaultParameterValues['Invoke-WebRequest:MaximumRetryCount'] = 5;
 $INSTPATH = 'C:\Program Files\';
 $graphiteVersion = '0.30.0';
-$ExporterVersion = "0.23.1";
+$ExporterVersion = "0.24.0";
 $SmartMonVersion = "7.4-1";
 $SmartMonReleaseDir = "7_4";
 $SmartCTLExporterVersion = "0.11.0";
@@ -290,7 +290,7 @@ if ($(ServiceCheck "OhmGraphite") -eq $false) {
 if ($(ServiceCheck "windows_exporter") -eq $false) {
     if ($false -eq (Test-Path -Path $($INSTPATH+'windows_exporter\windows_exporter.exe') -PathType Leaf)){
         Write-Host "Wasn't able to find Windows Exporter installation path. Starting the installation";
-        $exporterPrefixLink = "https://github.com/prometheus-community/windows_exporter/releases/download/v" + $ExporterVersion+"/windows_exporter-"+$ExporterVersion + "-" +$arch;
+        $exporterPrefixLink = "https://github.com/prometheus-community/windows_exporter/releases/download/v" + $ExporterVersion+"/windows_exporter-"+$ExporterVersion + "-" +$arch+".msi";
         $filePrometheusExporterInstaller = $downloadDir+'\ExporterInstaller.msi';
         if ($false -eq (Test-Path -Path $filePrometheusExporterInstaller -PathType Leaf)){
             try{
@@ -556,10 +556,10 @@ if ($false -eq (SchedulerCheck "Prometheus" "Promtail" )){
                     $rootFolder = $scheduleObject.GetFolder('\');
                     if ($false -eq $schedulerFolderExists){ 
                        try {
-                           $rootFolder.CreateFolder("Prometheus");
-                       }catch{
-                           Write-Warning ("An error occured when tried to create task scheduler folder: " + $_.Exception.Message); 
-                        }
+																$rootFolder.CreateFolder("Prometheus");
+													 }catch{
+																		Write-Warning ("An error occured when tried to create task scheduler folder: " + $_.Exception.Message); 
+																 }
                             $action = New-ScheduledTaskAction -Execute $('"' + $PromtailExecPath + '"') -Argument $('--config.file="'+ $PromtailDir +'\promtail-local-config.yaml" --config.expand-env=true');
                             $trigger = New-ScheduledTaskTrigger -AtStartup -RandomDelay (New-TimeSpan -minutes 3);
                             $settings = $(New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0);
@@ -581,3 +581,4 @@ if ($false -eq (SchedulerCheck "Prometheus" "Promtail" )){
 if ($wasreadonly){
     $dlfold.Attributes = $dlfold.Attributes -bor[System.IO.FileAttributes]::ReadOnly;
 }
+  
