@@ -126,7 +126,7 @@ function ServiceCheck([string] $ServiceName){
       for ($i=0; $i -lt $ServicePathString.Length; $i++){
         if (($ServicePathString[$i][2] -eq ':') -or ($ServicePathString[$i][1] -eq ':')){
           [System.Array]$indxList=@();
-          for ($indx =0;$indx -lt $ServicePathString[$i].Length; $indx++) {
+          for ($indx =0;$indx -lt $ServicePathString[$i].Length; $indx++){
             if ($ServicePathString[$i][$indx] -eq '"'){
               $indxList += $indx;
             }
@@ -141,7 +141,7 @@ function ServiceCheck([string] $ServiceName){
           $ServicePath += $ServicePathString[$i];
         }
       }
-      if ($ServicePath -ne $null) {
+      if ($ServicePath -ne $null){
         Write-Debug ("Succesfully extracted executable path from " + $ServiceName + " service");
         for ($k=0; $k -lt $ServicePath.Length; $k++){
           if ($null -ne $ServicePath[$k]){
@@ -517,7 +517,7 @@ if ($false -eq (SchedulerCheck "Prometheus" "SmartCtlExporter")){
       }
     }
     try{
-			Expand-Archive ($SmartCTLExporterFile) -DestinationPath ($INSTPATH)  -Force -ErrorAction Stop; ##Install (or rather unzip)
+			Expand-Archive $SmartCTLExporterFile -DestinationPath $INSTPATH -Force -ErrorAction Stop; ##Install (or rather unzip)
     }catch{
 			Write-Error ("Unable to unzip " + $SmartCTLExporterFile + ": " +$_.Exception.Message);
     }
@@ -526,12 +526,13 @@ if ($false -eq (SchedulerCheck "Prometheus" "SmartCtlExporter")){
   $scheduleObject.connect();
   $rootFolder = $scheduleObject.GetFolder('\');
   if ($false -eq $schedulerFolderExists){ 
-  try{
-    $rootFolder.CreateFolder("Prometheus");
-  }catch{
-    Write-Warning ("An error occured when tried to create task scheduler folder: " + $_.Exception.Message);}
-  }
-  $action = New-ScheduledTaskAction -Execute $('"' + $SmartCTLExporterExec + '"') -Argument $('--smartctl.path="C:\Program Files\smartmontools\bin\smartctl.exe"');
+		try{
+			$rootFolder.CreateFolder("Prometheus");
+		}catch{
+			Write-Warning ("An error occured when tried to create task scheduler folder: " + $_.Exception.Message);
+		}
+	}
+  $action = New-ScheduledTaskAction -Execute $('"' + $SmartCTLExporterExec + '"') -Argument $('--smartctl.path="' + $INSTPATH + 'smartmontools\bin\smartctl.exe"');
   $trigger = New-ScheduledTaskTrigger -AtStartup -RandomDelay (New-TimeSpan -minutes 3);
   $settings = $(New-ScheduledTaskSettingsSet -ExecutionTimeLimit 0);
   try{
@@ -553,17 +554,17 @@ if ($false -eq (SchedulerCheck "Prometheus" "SmartCtlExporter")){
 if ($false -eq (SchedulerCheck "Prometheus" "Promtail" )){
   $PromtailDir = $INSTPATH + "Promtail";
   $PromtailExecPath = $PromtailDir + '/promtail-windows-amd64.exe';
-  if ($true -eq (Test-Path -Path $($INSTPATH + "Promtail") -PathType Container)) {
+  if ($true -eq (Test-Path -Path $($INSTPATH + "Promtail") -PathType Container)){
     Write-Debug ("Promtail directory exists");
   }else{
     New-Item -Path $INSTPATH -Name "Promtail" -ItemType "directory";
   }
-  if ($true -eq (Test-Path -Path $($PromtailDir + '\var') -PathType Container)) {
+  if ($true -eq (Test-Path -Path $($PromtailDir + '\var') -PathType Container)){
     Write-Debug ("Promtail var directory already exists");
   }else{
     New-Item -Path $PromtailDir -Name "var" -ItemType "directory";
   }
-  if ($true -eq (Test-Path -Path $($PromtailDir + '\log') -PathType Container)) {
+  if ($true -eq (Test-Path -Path $($PromtailDir + '\log') -PathType Container)){
     Write-Debug ("Promtail log directory already exists");
   }else{
     New-Item -Path $PromtailDir -Name "log" -ItemType "directory";
