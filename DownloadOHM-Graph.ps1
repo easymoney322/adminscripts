@@ -410,6 +410,8 @@ function HandleInstallation([string]$InstDir, [string]$VersionString , [string]$
 }
 
 ## WindowsExporter
+$winexporter_config_path = $winexporter_dir_path+'config.yml';
+$winexporter_webconfig_path = $winexporter_dir_path+'web-config.yml';
 if ($false -eq (Test-Path -Path $winexporter_dir_path -PathType Container)){
 	New-Item -Path $winexporter_dir_path -ItemType "directory" | Out-Null;
 }
